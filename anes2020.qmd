@@ -1,0 +1,220 @@
+---
+title: "Final project tutorial: ANES 2020"
+format: 
+  html: 
+    embed-resources: true
+execute: 
+  warning: false 
+  message: false
+editor: visual
+---
+
+## Prerequisite: install required packages
+
+You only need to install these packages once. For your actual final projects, skip this step.
+
+```{r}
+#| eval: FALSE 
+
+install.packages(c("devtools", "labelled", "gtsummary"))
+devtools::install_github("jamesmartherus/anesr")
+
+install.packages("gtsummary") # optional for step 12
+```
+
+## Step 1: load required packages
+
+Remember: you need to load the tidyverse package every time you start a new R project. Other applicable packages depend on the project. For your final projects, load the following libraries:
+
+```{r}
+library(tidyverse)
+library(labelled)
+library(anesr) 
+library(gtsummary) # optional for step 12
+```
+
+## Step 2: import the dataset
+
+The dataset should appear in the environment tab.
+
+```{r}
+data(timeseries_2020)
+```
+
+## Step 3: identify your variables
+
+To find variables that you will be using in your final project, you need to know their names or labels. You have several ways to get that information.
+
+-   **Option 1** (not recommended): search directly within package `anesr` in R. In the tab that opens, use regular search option in the upper right corner: type any keywords of your interest. You can click on any variable to see its categories. Pay attention if the variable has any missing or negative values. Once you've identified all of your variables, take note of their names (e.g. v1408a).
+
+```{r}
+data(timeseries_cum_doc)
+view(timeseries_cum_doc)
+```
+
+-   **Option 2** (recommended): search in R using the `labelled` package. In the following code, replace "abortion" with a keyword of your interest. Pay attention if the variable has any missing or negative values. Once you've identified all of your variables, take note of their names (e.g. v1408a).
+
+```{r}
+look_for(timeseries_2020, "abortion") 
+```
+
+-   **Option 3** (recommended): use the [ANES Search](https://electionstudies.org/data-tools/anes-question-search/) tool - it is a fantastic resource to see variables and their distribution. Adjust the toggle to limit your search to 2020 only. Pay attention if the variable has any missing or negative values. If you need exact wording of any survey question, find it in the [ANES pdf](https://electionstudies.org/wp-content/uploads/2021/07/anes_timeseries_2020_questionnaire_20210719.pdf). Once you've identified all of your variables, take note of their names (e.g. v1408a).
+
+For example, I've identified the following three variables that I will use in my analysis. Most likely, your final projects will include more than 3 variables.
+
+-   V201380 Has corruption in government increased, decreased, or stayed the same since Donald Trump became president? (DV)
+
+-   V201511x Respondent 5 Category level of education (IV)
+
+-   V201600 What is your (R) sex? (CV)
+
+## Step 4: create a smaller, clean dataset
+
+This dataset will contain only your variables of interest from Step 3. You will work with this dataset from now on, not the main complete dataset. Give your new dataset an intuitive simple name (mine is named `test_project`; yours will be different).
+
+You will also need to rename your variables to something intuitive. In the example below, original variable names and the new names are for demonstration only. Yours will be different.
+
+Exception: the line of code `weight = V200010a` must be included exactly as written. It is responsible for weighting the dataset.
+
+```{r}
+test_project <- timeseries_2020  |> 
+  select(V201380, V201511x, V201600, V200010a) |> 
+  rename(
+    corruption = V201380,
+    education = V201511x,
+    sex = V201600, 
+    weight = V200010a
+  )
+```
+
+## Step 5: check for missing and abnormal values
+
+Before you move on to analysis, you need to check for abnormal values. In ANES, invalid answers (e.g. refused or don't know) are coded as -8 and -9. It is very important to convert them into missing values, otherwise, R will treat those negative values as part of the equation, and it will make your analysis statistically invalid.
+
+Replace corruption in the code below with the name of your variable. Repeat the same step for all the variables one by one. Take note which abnormal values you see.
+
+For categorical variables:
+
+```{r}
+
+test_project |> 
+  count(corruption)
+```
+
+For continuous variables (two options):
+
+```{r}
+summary(test_project$corruption)
+
+ggplot(test_project, aes(x = corruption)) + 
+  geom_histogram()
+```
+
+## Step 6: get rid of abnormal values
+
+Once you've identified abnormal values, turn them into NAs (missing values).
+
+Notice that I "renamed" my dataset using the same name. This action will quietly replace your dataset with missing values in place of abnormal ones. It is easier if you prefer to keep your working space clean. If you feel uneasy about it, provide a new name for your dataset - it will appear in the environment. From now on, you will be working with the new dataset. In this case, do not confuse the names of the dataset!
+
+```{r}
+test_project <- test_project |> 
+  mutate(across(everything(), ~if_else(.x < 0, NA, .x)))
+```
+
+## Step 7: verify that abnormal values are gone
+
+If you've done everything correctly, abnormal values should be replaced with NAs. Those NAs will be excluded from analysis automatically and won't skew your results.
+
+```{r}
+test_project |> 
+  count(education)
+```
+
+## Step 8: recode the variables if needed
+
+In ANES, most variables appear as numerical (double). In most cases, it's not a big deal. But in some cases, it is necessary to convert them into categorical variables (called factors in R). In other cases, the order of a variable's categories is incorrect, and you will need to change that.
+
+To check the coding of the original variables, your best bet is to examine the original variables via the ANES Search tool or ANES pdf.
+
+-   **Example 1**: Convert the `sex` variable into a factor. It helps with interpretation of the regression results.
+
+```{r}
+test_project <- test_project |> 
+  mutate(sex = as_factor(sex))
+```
+
+-   **Example 2**: recode the `corruption` variable's categories. Original variable's categories come as:
+
+1.  Increased
+
+2.  Decreased
+
+3.  Stayed the same
+
+This is an ordinal variable where the categories reflect a ranking. In this case, we want to streamline the categories in a way that unambiguously show increase in corruption. In other words, we are moving from less corruption to more corruption.
+
+Note that I am "renaming" my new recoded variable using the same name. It will quietly rewrite the old variable.
+
+```{r}
+test_project <- test_project |>
+  mutate(
+    corruption = case_match(corruption,
+                            2 ~ 1,  # Old Decreased (2) becomes 1
+                            3 ~ 2,  # Old Stayed same (3) becomes 2
+                            1 ~ 3,  # Old Increased (1) becomes 3
+                            .default = NA)
+  ) |>
+  set_value_labels(corruption = c("Decreased" = 1, 
+                                  "Stayed the same" = 2, 
+                                  "Increased" = 3))
+```
+
+## Step 9: check that recoding was successful
+
+Note: in Quarto, the labels aren't printed. When typing in script, you can see the labels in the console.
+
+```{r}
+test_project |> 
+  count(corruption)
+```
+
+## Step 10: create a linear model
+
+Replace the example variables below with the names of your variables. Note that DV comes first. Always include the weight variable as is.
+
+Give your model an intuitive name (I am using generic model_test_project; yours will be different).
+
+```{r}
+model_test_project <- lm(corruption ~ education + sex, 
+                         data = test_project, 
+                         weights = weight)
+```
+
+## Step 11: examine the results of the linear model
+
+```{r}
+summary(model_test_project)
+```
+
+You can stop at this point. If you want to format this regression table in a word processor or Excel, just copy it and paste it in the program where you are writing your final project. If you want to create a pretty table in R and save it as is, continue below.
+
+```{r}
+model_test_project |>
+  tbl_regression(
+    exponentiate = FALSE, # Set to TRUE for Logistic Regression (Odds Ratios)
+    label = list(
+      education ~ "Education Level",
+      sex ~ "Gender"
+    )
+  ) |> 
+  add_significance_stars(
+    hide_ci = FALSE, # Keeps the Confidence Interval
+    hide_p = FALSE   # Keeps the p-value column alongside the stars
+  ) |> 
+  bold_labels() |> # Makes variable names bold
+  italicize_levels() |> # Makes the categories italic
+  modify_caption("**Effect of Education and Sex on Corruption Perception**") |>
+  modify_footnote(
+    estimate ~ "\\*p<0.05; \\**p<0.01; \\***p<0.001"
+  )
+```

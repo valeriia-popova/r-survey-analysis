@@ -1,0 +1,164 @@
+---
+title: "Final project tutorial: ANES 2024"
+format:
+  html:
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+editor: visual
+---
+
+## Prerequisite: Install required packages
+
+You only need to install these packages once. For your actual final projects, skip this step.
+
+```{r}
+#| eval: false 
+install.packages(c("pak", "labelled"))
+pak::pak("tidy-survey-r/srvyrexploR")
+install.packages("gtsummary") # optional for step 10
+```
+
+## Step 1: Load required packages
+
+Remember: you need to load the **tidyverse** package every time you start a new R project. Other applicable packages depend on the project. For your final projects, load the following libraries:
+
+```{r}
+#| output: false
+library(tidyverse)
+library(srvyrexploR)
+library(labelled)
+library(gtsummary) # optional for step 10
+```
+
+## Step 2: Import the dataset
+
+The dataset will appear in the **Environment** tab. Since we are using the `srvyrexploR` package, we load the data directly into R.
+
+```{r}
+data(anes_2024)
+```
+
+## Step 3: Identify your variables
+
+To find variables that you will be using in your final project, you need to know their names or labels. You have several ways to get that information.
+
+**Option 1:** Search in R using the **labelled** package. In the following code, replace "Trust" with a keyword of your interest. Pay attention to whether the variable has any missing or abnormal values. Once you have identified all of your variables, take note of their names (e.g., `TrustGovernment`).
+
+```{r}
+look_for(anes_2024, "Trust")
+```
+
+**Option 2:** Use the `view()` function to scroll through the dataset in a new tab. You can use the search bar in the top right corner of that tab to find specific keywords.
+
+```{r}
+#| eval: false
+view(anes_2024)
+```
+
+For example, I have identified the following three variables for this analysis:
+
+-   `TrustGovernment`: How often can you trust the government in Washington to do what is right? (DV)
+-   `Education`: Respondent's education level in years (IV)
+-   `Sex`: Respondent's sex (CV)
+
+## Step 4: Create a smaller, clean dataset
+
+This dataset will contain only your variables of interest from Step 3. You will work with this dataset from now on, not the main complete dataset. Give your new dataset an intuitive, simple name (mine is named `test_project`; yours will be different).
+
+You will also need to rename your variables to something intuitive. In the example below, the original variable names and the new names are for demonstration only. Yours will be different.
+
+**Exception:** The line of code `weight = Weight` must be included exactly as written. It is responsible for weighting the ANES dataset.
+
+```{r}
+test_project <- anes_2024 |> 
+  select(TrustGovernment, Education, Sex, Weight) |> 
+  rename(
+    trust = TrustGovernment,
+    education = Education,
+    sex = Sex,
+    weight = Weight
+  )
+```
+
+## Step 5: Check for missing and abnormal values
+
+Before you move on to analysis, you need to check for missing and abnormal values. If you forget to exclude missing values or "skip codes" from analysis, your charts and models will be inaccurate.
+
+Replace `trust` in the code below with the name of your variable. Repeat the same step for all variables one by one. Take note of which abnormal values you see (for example, values like 95 or 99 in a years of education variable).
+
+For categorical variables:
+
+```{r}
+test_project |> 
+  count(trust)
+```
+
+For continuous variables (two options):
+
+```{r}
+summary(test_project$education)
+
+ggplot(test_project, aes(x = education)) + 
+  geom_histogram()
+```
+
+## Step 6: Recode the variables if needed
+
+In the ANES, some variables may include numeric codes for non-substantive answers (like "Other" or "Refused"). For example, if your education histogram shows a value of 95, you must filter it out so it does not skew your results.
+
+Note that I am "renaming" my new recoded dataset using the same name. It will quietly rewrite the old dataset with the cleaned values.
+
+```{r}
+test_project <- test_project |> 
+  filter(education <= 25)
+```
+
+## Step 7: Check that recoding was successful
+
+Re-run your histogram or count to ensure the abnormal values are gone.
+
+```{r}
+ggplot(test_project, aes(x = education)) + 
+  geom_histogram()
+```
+
+## Step 8: Create a linear model
+
+Replace the example variables below with the names of your variables. Note that the DV comes first. Because the dependent variable in this package is often stored as a factor, we use `as.numeric()` to ensure the linear model runs correctly.
+
+Always include the weight variable as is. Give your model an intuitive name (I am using `model_test_project`).
+
+```{r}
+model_test_project <- lm(as.numeric(trust) ~ education + sex, 
+                         data = test_project, 
+                         weights = weight)
+```
+
+## Step 9: Examine the results of the linear model
+
+```{r}
+summary(model_test_project)
+```
+
+You can stop at this point. If you want to format this regression table in a word processor or Excel, just copy and paste it into the program where you are writing your final project. If you want to create a professional table in R, continue below.
+
+## Step 10 (optional): Create a custom table
+
+```{r}
+model_test_project |> 
+  tbl_regression(
+    label = list(
+      education ~ "Years of education",
+      sex ~ "Sex"
+    )
+  ) |> 
+  add_significance_stars(hide_ci = FALSE, hide_p = FALSE) |> 
+  bold_labels() |> 
+  italicize_levels() |> 
+  modify_caption("**Effect of Education and Sex on Trust in Government (ANES 2024)**") |>
+  modify_footnote(
+    estimate ~ "\\*p<0.05; \\**p<0.01; \\***p<0.001"
+  )
+```
