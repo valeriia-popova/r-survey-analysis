@@ -93,21 +93,24 @@ Replace `corruption` in the code below with the name of your variable. Repeat th
 
 Note: sometimes in Quarto, the labels aren't printed. When typing in script, you can see the labels in the console.
 
-For categorical variables:
+For categorical and ordinal variables:
 
 ```{r}
 
 test_project |> 
   count(corruption)
+
+barplot(table(test_project$corruption)) 
 ```
 
-For continuous variables (two options):
+For continuous variables:
 
 ```{r}
 summary(test_project$education)
 
-ggplot(test_project, aes(x = education)) + 
-  geom_histogram()
+hist(test_project$education)
+
+boxplot(test_project$education)
 ```
 
 ## Step 6: recode the variables if needed

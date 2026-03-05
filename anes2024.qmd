@@ -88,20 +88,23 @@ Before you move on to analysis, you need to check for missing and abnormal value
 
 Replace `trust` in the code below with the name of your variable. Repeat the same step for all variables one by one. Take note of which abnormal values you see (for example, values like 95 or 99 in a years of education variable).
 
-For categorical variables:
+For categorical and ordinal variables:
 
 ```{r}
 test_project |> 
   count(trust)
+
+barplot(table(test_project$trust)) 
 ```
 
-For continuous variables (two options):
+For continuous variables:
 
 ```{r}
 summary(test_project$education)
 
-ggplot(test_project, aes(x = education)) + 
-  geom_histogram()
+hist(test_project$education)
+
+boxplot(test_project$education)
 ```
 
 ## Step 6: Recode the variables if needed
