@@ -50,12 +50,7 @@ To find variables that you will be using in your final project, you need to know
 look_for(anes_2024, "Trust")
 ```
 
-**Option 2:** Use the `view()` function to scroll through the dataset in a new tab. You can use the search bar in the top right corner of that tab to find specific keywords.
-
-```{r}
-#| eval: false
-view(anes_2024)
-```
+**Option 2:** Use the [ANES Search tool](https://electionstudies.org/data-tools/anes-question-search/) to look for keywords of interest. Limit your search to year 2024.
 
 For example, I have identified the following three variables for this analysis:
 
@@ -88,23 +83,20 @@ Before you move on to analysis, you need to check for missing and abnormal value
 
 Replace `trust` in the code below with the name of your variable. Repeat the same step for all variables one by one. Take note of which abnormal values you see (for example, values like 95 or 99 in a years of education variable).
 
-For categorical and ordinal variables:
+For categorical variables:
 
 ```{r}
 test_project |> 
   count(trust)
-
-barplot(table(test_project$trust)) 
 ```
 
-For continuous variables:
+For continuous variables (two options):
 
 ```{r}
 summary(test_project$education)
 
-hist(test_project$education)
-
-boxplot(test_project$education)
+ggplot(test_project, aes(x = education)) + 
+  geom_histogram()
 ```
 
 ## Step 6: Recode the variables if needed
